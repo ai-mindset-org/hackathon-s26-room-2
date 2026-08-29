@@ -1,0 +1,418 @@
+{
+  "name": "[TEST] [HACK] Ответ клиенту по базе + гард",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Запустить вручную",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "req",
+              "name": "request",
+              "value": "Здравствуйте! Посчитайте, пожалуйста, КП: SSD 1.92 TB — 12 шт, HDD 16 TB — 2 шт,\r\nсалазки — 14 шт. Как быстро привезёте и что по доставке? Иван, ИП Крылов.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Пример запроса",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "answer-guard",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        200
+      ],
+      "webhookId": "a7f1c2e4-9b3d-4c5a-8e6f-1d2b3c4a5e6f"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ЗАГЛУШКА БАЗЫ ЗНАНИЙ.\n// В проде тут Supabase/Postgres retrieval — вернуть те же поля, и ничего ниже\n// по цепочке менять не придётся.\nconst src = $input.first().json;\nconst request = src.request || (src.body && src.body.request) || '';\n\nconst base = {\n  \"прайс.md\": \"# Прайс «ТехноСклад» (синтетика)\\r\\n\\r\\n| Позиция | Артикул | Цена, ₽ | Срок поставки |\\r\\n|---|---|---|---|\\r\\n| SSD 960 GB enterprise | TS-960E | 18 400 | 3 дня |\\r\\n| SSD 1.92 TB enterprise | TS-192E | 33 900 | 3 дня |\\r\\n| HDD 8 TB | TS-8H | 21 200 | 5 дней |\\r\\n| HDD 16 TB | TS-16H | 39 800 | 10 дней |\\r\\n| Салазки универсальные | TS-TRAY | 2 100 | в наличии |\\r\\n\\r\\nСкидка от 10 шт одной позиции — 7%. Доставка по городу бесплатно от 50 000 ₽.\\r\\n\",\n  \"прошлый-ответ-доступ.md\": \"# Образец: восстановление доступа в личный кабинет\\r\\n\\r\\nШаги, которые сработали: 1) «забыли пароль» на странице входа; 2) письмо\\r\\nприходит с адреса no-reply@technosklad.example, проверить спам; 3) ссылка живёт\\r\\n2 часа; 4) если письма нет — доступ восстанавливает поддержка по звонку после\\r\\nподтверждения ИНН.\\r\\n\",\n  \"регламент-ответов.md\": \"# Регламент ответов клиентам\\r\\n\\r\\n1. Обращение по имени, на «вы», без канцелярита.\\r\\n2. В ответе на проблему: сначала шаги решения, потом причина, в конце — что\\r\\n   делать, если не помогло (контакт поддержки).\\r\\n3. Цены называем только из действующего прайса, со ссылкой на артикул.\\r\\n4. Сроков «завтра» не обещаем — только сроки из прайса.\\r\\n5. Если ответа в базе нет — честно говорим и передаём менеджеру. Выдумывать нельзя.\\r\\n6. Подпись: «Команда ТехноСклад».\\r\\n\"\n};\n\nreturn [{ json: { request, base } }];"
+      },
+      "name": "База знаний (заглушка)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ЗАГЛУШКА СДЕЛКИ BITRIX24 — тот самый «пустой слот» под CRM.\n// Форма данных ровно та, что вернут crm.deal.get + crm.deal.productrows.get +\n// crm.contact.get. Подключение Bitrix меняет ИСТОЧНИК, а не форму:\n// достаточно включить соседнюю HTTP-ноду и отдать её ответ в этом же виде.\n//\n// Чтобы проверить поведение без CRM — верните deal: null,\n// и все проверки группы «сделка» просто промолчат.\nconst prev = $input.first().json;\n\nconst deal = {\n  \"_комментарий\": \"Заглушка сделки Bitrix24. Ровно та форма данных, которую вернёт crm.deal.get + crm.deal.productrows.get + crm.contact.get. Подключение Bitrix меняет источник, но не форму.\",\n  \"id\": \"1042\",\n  \"currency\": \"RUB\",\n  \"total\": 485266,\n  \"stage\": \"В работе\",\n  \"stage_allows_shipping\": true,\n  \"contact_name\": \"Иван\",\n  \"contact_phone\": \"+7 999 123-45-67\",\n  \"products\": [\n    {\n      \"article\": \"TS-192E\",\n      \"name\": \"SSD 1.92 TB enterprise\",\n      \"price\": 33900,\n      \"quantity\": 12\n    },\n    {\n      \"article\": \"TS-16H\",\n      \"name\": \"HDD 16 TB\",\n      \"price\": 39800,\n      \"quantity\": 2\n    },\n    {\n      \"article\": \"TS-TRAY\",\n      \"name\": \"Салазки универсальные\",\n      \"price\": 2100,\n      \"quantity\": 14\n    }\n  ]\n};\n\nreturn [{ json: { request: prev.request, base: prev.base, deal } }];"
+      },
+      "name": "Сделка Bitrix24 (заглушка)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://ВАШ-ПОРТАЛ.bitrix24.ru/rest/1/ВЕБХУК/crm.deal.get.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ $json.deal_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Bitrix24 crm.deal.get — подключить позже",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        320
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты готовишь ЧЕРНОВИК ответа клиенту компании «ТехноСклад».\nЧерновик читает человек, правит и отправляет сам.\n\nЗАПРОС КЛИЕНТА:\n{{ $json.request }}\n\nБАЗА КОМПАНИИ — единственный разрешённый источник фактов:\n\n=== прайс.md ===\n{{ $json.base['прайс.md'] }}\n\n=== регламент-ответов.md ===\n{{ $json.base['регламент-ответов.md'] }}\n\n=== прошлый-ответ-доступ.md ===\n{{ $json.base['прошлый-ответ-доступ.md'] }}\n\nВерни только текст письма, без пояснений и без markdown-заголовков.",
+        "options": {
+          "systemMessage": "=Ты — ассистент поддержки компании «ТехноСклад».\n\nЖёсткие правила:\n1. Каждый факт, число, цену, срок и артикул бери ТОЛЬКО из базы выше. Ничего не выдумывай.\n2. Цену называй всегда вместе с артикулом.\n3. Скидка 7% — только для позиции от 10 шт одной позиции. Меньше 10 шт — скидки нет.\n4. Не обещай «завтра» и не давай безусловных обещаний («гарантирую», «100%»). Сроки — только из прайса.\n5. Если ответа в базе нет — честно скажи об этом и передай вопрос менеджеру. Не придумывай.\n6. Обращайся по имени, на «вы», живым языком, без канцелярита.\n7. Подпись в конце: «Команда ТехноСклад».\n\nОтвет на проблему строй так: сначала шаги решения, потом причина, в конце — что делать,\nесли не помогло.\n\nПомни: после тебя черновик проходит автоматическую проверку, которая сверяет каждое\nчисло и артикул с базой. Выдуманный факт будет отклонён, и ответ не уйдёт клиенту."
+        }
+      },
+      "name": "Черновик ответа",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        700,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {}
+      },
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        700,
+        320
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "eiCWbTLWQ6dhq03J",
+          "name": "DK "
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * guard.js — проверка черновика ответа клиенту: выдумка + регламент + сверка со сделкой.\n *\n * Порт Python-модуля src/guard на чистый JS, чтобы жить в n8n Code-ноде\n * без внешних зависимостей, без деплоя и без Python-песочницы.\n *\n * Контракт (вход):\n *   {\n *     request: \"текст запроса клиента\",\n *     draft:   \"текст черновика ответа\",\n *     base:    { \"прайс.md\": \"...\", \"регламент-ответов.md\": \"...\", ... },\n *     deal:    null | {\n *       id, currency, total, stage, stage_allows_shipping,\n *       contact_name, products: [{article, name, price, quantity}]\n *     }\n *   }\n *\n * Контракт (выход):\n *   { passed, stats: {...}, violations: [...], claims: [...] }\n *\n * deal === null означает «CRM не подключена» — проверки группы «сделка»\n * молча пропускаются, остальные работают. Это и есть шов для Bitrix24.\n */\n\n'use strict';\n\nconst ERROR = 'error';\nconst WARNING = 'warning';\n\n// Пробелы, которыми в русском тексте разделяют разряды: обычный, неразрывный, узкий.\nconst THIN = '    ';\nconst NUM_RE = new RegExp(\n  '\\\\d{1,3}(?:[' + THIN + ']\\\\d{3})+(?:[.,]\\\\d+)?|\\\\d+(?:[.,]\\\\d+)?',\n  'g'\n);\n\n// В JS \\b и \\w НЕ понимают кириллицу (\\w === [A-Za-z0-9_]), поэтому и границы\n// слова, и «хвост» русского слова задаём явно. Иначе «скидк\\w*» молча никогда\n// не сработает — самая коварная ошибка при переносе с Python.\nconst WORD = 'А-Яа-яЁёA-Za-z0-9_';\nconst RW = '[а-яёА-ЯЁ]'; // одна русская буква\nconst word = (body, flags) =>\n  new RegExp('(?<![' + WORD + '])(?:' + body + ')(?![' + WORD + '])', flags || 'i');\n\nconst EMAIL_RE = /[\\w.+-]+@[\\w-]+\\.[\\w.-]+/g;\nconst ARTICLE_RE = /\\b[A-Z]{2,}-[A-Z0-9]{1,8}\\b/g;\nconst URL_RE = /https?:\\/\\/[^\\s)\\]]+|\\b[\\w-]+\\.(?:ru|com|example|org|net)\\b/g;\nconst CODE_RE = /\\b[A-Za-z]{2,}-[A-Za-z0-9]+\\b/g;\nconst PHONE_RE = /(?:\\+7|\\b8)[\\s\\-(]*\\d{3}[\\s\\-)]*\\d{3}[\\s\\-]*\\d{2}[\\s\\-]*\\d{2}\\b/g;\n\nconst CONTEXT = 28;\nconst TOLERANCE = 0.5;\nconst MAX_SUM_TERMS = 6;\n\nconst MONEY_HINTS = ['₽', 'руб', 'цена', 'цен', 'стоим', 'сумм', 'итого', 'скидк', 'прайс'];\nconst DURATION_HINTS = ['дн', 'день', 'дня', 'час', 'недел', 'месяц', 'срок'];\n\n// ---------------------------------------------------------------- числа\n\nfunction normalize(raw) {\n  let cleaned = raw;\n  for (const space of THIN) cleaned = cleaned.split(space).join('');\n  return parseFloat(cleaned.replace(',', '.'));\n}\n\nfunction maskCodes(text) {\n  // TS-192E не должен подарить черновику «число» 192.\n  return String(text || '').replace(CODE_RE, (m) => ' '.repeat(m.length));\n}\n\nfunction classify(text, start, end, raw) {\n  const before = text.slice(Math.max(0, start - CONTEXT), start).toLowerCase();\n  const after = text.slice(end, end + CONTEXT).toLowerCase();\n\n  const tail = before.replace(/\\s+$/, '');\n  if (/(п\\.|№|#|пункт)$/.test(tail)) return 'reference';\n\n  // Маркер нумерованного списка «1.» / «2)» — разметка, а не факт о мире.\n  const lineHead = before.split('\\n').pop();\n  if (!lineHead.replace(/[\\s\\t\\-*]/g, '') && /^[.)][\\s\\t]/.test(after)) return 'reference';\n\n  if (after.trimStart().startsWith('%') || after.slice(0, 8).includes('%')) return 'percent';\n  if (after.slice(0, 10).includes('шт')) return 'qty';\n  if (DURATION_HINTS.some((h) => after.slice(0, 14).includes(h))) return 'duration';\n  if (after.slice(0, 10).includes('₽')) return 'money';\n  if (MONEY_HINTS.some((h) => after.slice(0, 14).includes(h))) return 'money';\n  if (MONEY_HINTS.some((h) => before.slice(-20).includes(h))) return 'money';\n  if ([...THIN].some((s) => raw.includes(s))) return 'money';\n  return 'other';\n}\n\nfunction extractNumbers(text) {\n  const src = String(text || '');\n  const found = [];\n  let match;\n  NUM_RE.lastIndex = 0;\n  while ((match = NUM_RE.exec(src)) !== null) {\n    const raw = match[0];\n    const start = match.index;\n    const end = start + raw.length;\n    found.push({\n      value: normalize(raw),\n      raw,\n      kind: classify(src, start, end, raw),\n      line: src.slice(0, start).split('\\n').length,\n      context: src.slice(Math.max(0, start - CONTEXT), end + CONTEXT).replace(/\\n/g, ' ').trim(),\n    });\n  }\n  return found;\n}\n\n// ---------------------------------------------------------------- база\n\nfunction splitRow(line) {\n  return line.trim().replace(/^\\||\\|$/g, '').split('|').map((c) => c.trim());\n}\n\nfunction parseLeadTime(raw) {\n  const lowered = String(raw || '').toLowerCase();\n  if (lowered.includes('налич')) return 0;\n  const m = /(\\d+)/.exec(raw || '');\n  return m ? parseInt(m[1], 10) : null;\n}\n\nfunction parsePriceTable(text, source) {\n  const rows = [];\n  let header = null;\n  for (const line of String(text).split('\\n')) {\n    if (!line.trim().startsWith('|')) {\n      header = null;\n      continue;\n    }\n    const cells = splitRow(line);\n    if (cells.filter(Boolean).every((c) => /^:?-{2,}:?$/.test(c))) continue;\n    if (header === null) {\n      header = cells.map((c) => c.toLowerCase());\n      continue;\n    }\n    const column = (...keys) => {\n      for (let i = 0; i < header.length; i++) {\n        if (keys.some((k) => header[i].includes(k)) && i < cells.length) return cells[i];\n      }\n      return '';\n    };\n    const article = column('артикул');\n    const priceRaw = column('цена', 'стоим');\n    if (!article || !priceRaw) continue;\n    NUM_RE.lastIndex = 0;\n    const digits = NUM_RE.exec(priceRaw);\n    if (!digits) continue;\n    rows.push({\n      name: column('позиция', 'наименование', 'товар') || cells[0],\n      article,\n      price: normalize(digits[0]),\n      leadDays: parseLeadTime(column('срок', 'постав')),\n      source,\n    });\n  }\n  return rows;\n}\n\nfunction loadBase(files) {\n  const index = {\n    files: files || {},\n    numbers: new Map(),\n    emails: new Set(),\n    articles: new Set(),\n    urls: new Set(),\n    priceRows: [],\n    discountMinQty: null,\n    discountPercent: null,\n    freeDeliveryFrom: null,\n    allText: '',\n  };\n\n  for (const [name, text] of Object.entries(index.files)) {\n    index.allText += '\\n' + text;\n\n    for (const n of extractNumbers(text)) {\n      // Номера пунктов регламента — не факты: иначе «6. Подпись» обоснует «6 часов».\n      if (n.kind === 'reference') continue;\n      if (!index.numbers.has(n.value)) index.numbers.set(n.value, name + ':' + n.line);\n    }\n\n    (text.match(EMAIL_RE) || []).forEach((e) => index.emails.add(e));\n    (text.match(ARTICLE_RE) || []).forEach((a) => index.articles.add(a));\n    (text.match(URL_RE) || []).forEach((u) => index.urls.add(u.toLowerCase()));\n    index.priceRows.push(...parsePriceTable(text, name));\n\n    const disc = new RegExp(\n      `скидк${RW}*\\\\s+от\\\\s+(\\\\d+)\\\\s*шт[^.]*?(\\\\d+(?:[.,]\\\\d+)?)\\\\s*%`, 'i'\n    ).exec(text);\n    if (disc) {\n      index.discountMinQty = parseInt(disc[1], 10);\n      index.discountPercent = normalize(disc[2]);\n    }\n    const deliv = /доставка[^.]*?бесплатн[а-яёА-ЯЁ]*\\s+от\\s+([\\d    ]+)/i.exec(text);\n    if (deliv) index.freeDeliveryFrom = normalize(deliv[1].trim());\n  }\n\n  index.priceRows.forEach((r) => index.articles.add(r.article));\n  return index;\n}\n\nfunction hasNumber(index, value) {\n  for (const [known, src] of index.numbers) {\n    if (Math.abs(known - value) <= 0.01) return src;\n  }\n  return null;\n}\n\nfunction priceOf(index, article) {\n  const up = String(article).toUpperCase();\n  return index.priceRows.find((r) => r.article.toUpperCase() === up) || null;\n}\n\n// ---------------------------------------------------------------- вывод чисел\n\nconst close = (a, b) => Math.abs(a - b) <= TOLERANCE;\nconst money = (n) => n.toLocaleString('ru-RU').replace(/,/g, ' ');\n\nfunction fromPriceMath(value, index, quantities) {\n  const disc = index.discountPercent;\n  for (const row of index.priceRows) {\n    for (const qty of quantities) {\n      if (qty <= 0) continue;\n      const lineTotal = qty * row.price;\n      if (close(value, lineTotal)) {\n        return { source: `расчёт: ${qty} × ${money(row.price)} (${row.article})`, earned: true };\n      }\n      if (disc === null) continue;\n      const discounted = lineTotal * (1 - disc / 100);\n      if (close(value, discounted) || close(value, Math.round(discounted))) {\n        const earned = index.discountMinQty === null || qty >= index.discountMinQty;\n        return {\n          source: `расчёт: ${qty} × ${money(row.price)} (${row.article}) − ${disc}%`,\n          earned,\n          qty,\n          article: row.article,\n        };\n      }\n    }\n  }\n  return null;\n}\n\nfunction fromSum(value, parts) {\n  const usable = parts.filter((p) => p > 0 && !close(p, value));\n  if (usable.length < 2) return null;\n  const max = Math.min(MAX_SUM_TERMS, usable.length);\n\n  const walk = (start, chosen, sum) => {\n    if (chosen.length >= 2 && close(sum, value)) return chosen.slice();\n    if (chosen.length >= max) return null;\n    for (let i = start; i < usable.length; i++) {\n      chosen.push(usable[i]);\n      const hit = walk(i + 1, chosen, sum + usable[i]);\n      if (hit) return hit;\n      chosen.pop();\n    }\n    return null;\n  };\n\n  const combo = walk(0, [], 0);\n  return combo ? { source: 'сумма: ' + combo.map(money).join(' + ') } : null;\n}\n\n// ---------------------------------------------------------------- проверки\n\nfunction paragraphs(text) {\n  const result = [];\n  let lineNo = 1;\n  for (const block of String(text).split(/\\n\\s*\\n/)) {\n    result.push({ line: lineNo, text: block });\n    lineNo += (block.match(/\\n/g) || []).length + 2;\n  }\n  return result;\n}\n\nconst TY_RE = word('ты|тебе|тебя|твой|твоя|твои|твоего|тобой');\nconst TOMORROW_RE = word('завтра|послезавтра');\nconst SOON_RE = /(сегодня же|в течение дня|в ближайшее время|максимально быстро)/i;\nconst ABSOLUTE_RE = word(\n  `гарантиру${RW}*|стопроцентн${RW}*|точно успе${RW}*|обязательно успе${RW}*`\n);\nconst HUNDRED_RE = /\\b100\\s?%/;\nconst SIGNATURE = 'команда техносклад';\nconst NET = `(?<![${WORD}])нет(?![${WORD}])`;\nconst ADMISSION_RE = new RegExp(\n  `(?:(?:в\\\\s+)?(?:баз${RW}+|прайс${RW}+|наличи${RW}+)[^.!?]{0,60}?${NET}` +\n    `|${NET}[^.!?]{0,60}?(?:в\\\\s+)?(?:баз${RW}+|прайс${RW}+|наличи${RW}+)` +\n    `|отсутств${RW}*|не\\\\s+найд${RW}*|не\\\\s+поставля${RW}*|не\\\\s+значится` +\n    `|не\\\\s+мог${RW}*\\\\s+(?:назвать|подтвердить|обещать))`,\n  'i'\n);\nconst HANDOFF_RE = /(менеджер|переда|свяж)/i;\nconst TOPIC_LEXICON = [\n  'юан', 'доллар', 'евро', 'рассрочк', 'отсрочк', 'лизинг', 'аккредитив',\n  'библиотек', 'ленточн', 'стример', 'коммутатор', 'лицензи', 'гаранти',\n  'монтаж', 'аренд', 'утилизац',\n];\n\nfunction unknownTopics(request, index) {\n  const found = [];\n  const lowered = String(request || '').toLowerCase();\n  const baseLower = index.allText.toLowerCase();\n\n  for (const token of String(request || '').match(/\\b[A-Za-z]{2,}(?:-\\d+)?\\b/g) || []) {\n    if (token.length < 3) continue;\n    if (baseLower.includes(token.toLowerCase())) continue;\n    if (!found.some((f) => f.toUpperCase() === token.toUpperCase())) found.push(token);\n  }\n  for (const topic of TOPIC_LEXICON) {\n    if (lowered.includes(topic) && !baseLower.includes(topic)) found.push(topic);\n  }\n  return found;\n}\n\nfunction candidateNames(request) {\n  const stop = new Set([\n    'ооо', 'ип', 'зао', 'оао', 'клиент', 'тикет', 'здравствуйте', 'добрый',\n    'день', 'привет', 'как', 'можно', 'заказ', 'спасибо', 'прима',\n  ]);\n  const names = [];\n  for (const m of String(request || '').matchAll(/([А-ЯЁ][а-яё]{2,})/g)) {\n    if (!stop.has(m[1].toLowerCase())) names.push(m[1]);\n  }\n  return names;\n}\n\n// ---------------------------------------------------------------- главное\n\nfunction checkDraft(input) {\n  const draft = String(input.draft || '');\n  const request = input.request ? String(input.request) : null;\n  const deal = input.deal || null;\n  const index = loadBase(input.base || {});\n\n  const violations = [];\n  const claims = [];\n  const add = (code, severity, message, extra) =>\n    violations.push(Object.assign({ code, severity, message }, extra || {}));\n\n  // --- количества: явные «12 шт» точнее случайных чисел\n  const collectQty = (kinds) => {\n    const out = [];\n    for (const text of [request || '', draft]) {\n      for (const n of extractNumbers(maskCodes(text))) {\n        if (kinds.includes(n.kind) && Number.isInteger(n.value)) {\n          if (n.value >= 1 && n.value <= 10000 && !out.includes(n.value)) out.push(n.value);\n        }\n      }\n    }\n    return out;\n  };\n  const quantities = collectQty(['qty']).length\n    ? collectQty(['qty'])\n    : collectQty(['qty', 'other']);\n\n  // --- заземление чисел\n  const requestNumbers = new Set(\n    request ? extractNumbers(maskCodes(request)).map((n) => n.value) : []\n  );\n  const found = extractNumbers(maskCodes(draft)).filter((n) => n.kind !== 'reference');\n  const numberClaims = found.map((n) => ({\n    text: n.raw, kind: n.kind, line: n.line, grounded: false, source: null, context: n.context,\n  }));\n\n  found.forEach((item, i) => {\n    const claim = numberClaims[i];\n    const literal = hasNumber(index, item.value);\n    if (literal) { claim.grounded = true; claim.source = 'база: ' + literal; return; }\n    if (requestNumbers.has(item.value)) {\n      claim.grounded = true; claim.source = 'запрос клиента'; return;\n    }\n    const computed = fromPriceMath(item.value, index, quantities);\n    if (computed) {\n      claim.grounded = true;\n      claim.source = computed.source;\n      if (computed.earned === false) {\n        add('discount_not_earned', ERROR,\n          `Скидка применена к позиции, где её нет: ${item.raw} (порог — ${index.discountMinQty} шт)`,\n          { evidence: item.context, line: item.line, rule: 'прайс: условия скидки' });\n      }\n    }\n  });\n\n  for (let pass = 0; pass < 2; pass++) {\n    const anchors = found\n      .map((item, i) => (numberClaims[i].grounded && item.kind === 'money' ? item.value : null))\n      .filter((v) => v !== null);\n    found.forEach((item, i) => {\n      const claim = numberClaims[i];\n      if (claim.grounded || item.kind !== 'money') return;\n      const summed = fromSum(item.value, anchors);\n      if (summed) { claim.grounded = true; claim.source = summed.source; }\n    });\n  }\n\n  found.forEach((item, i) => {\n    const claim = numberClaims[i];\n    if (claim.grounded) return;\n    const hard = ['money', 'duration', 'percent'].includes(item.kind) ||\n      (item.kind === 'qty' && request !== null);\n    add('ungrounded_number', hard ? ERROR : WARNING,\n      `Число ${item.raw} не выводится из базы`,\n      { evidence: item.context, line: item.line, rule: 'регламент п.5' });\n  });\n  claims.push(...numberClaims);\n\n  // --- заземление сущностей\n  const asked = (request || '').toLowerCase();\n  const addEntity = (text, kind, known, message) => {\n    const quoted = Boolean(asked) && asked.includes(text.toLowerCase());\n    claims.push({\n      text, kind, line: 0, grounded: known || quoted,\n      source: known ? 'база' : quoted ? 'запрос клиента' : null,\n    });\n    if (!known && !quoted) {\n      add('unknown_' + kind, ERROR, message, { evidence: text, rule: 'регламент п.5' });\n    }\n  };\n\n  new Set(draft.match(EMAIL_RE) || []).forEach((e) =>\n    addEntity(e, 'email', index.emails.has(e), `Адрес ${e} отсутствует в базе`));\n\n  const knownArticles = new Set([...index.articles].map((a) => a.toUpperCase()));\n  const dealArticles = new Set(\n    (deal && deal.products ? deal.products : []).map((p) => String(p.article).toUpperCase())\n  );\n  new Set(draft.match(ARTICLE_RE) || []).forEach((a) => {\n    const known = knownArticles.has(a.toUpperCase()) || dealArticles.has(a.toUpperCase());\n    addEntity(a, 'article', known, `Артикул ${a} отсутствует в прайсе`);\n  });\n\n  new Set((draft.match(URL_RE) || []).map((u) => u.toLowerCase())).forEach((u) => {\n    if (u.includes('@')) return;\n    addEntity(u, 'url', index.urls.has(u), `Ссылка ${u} отсутствует в базе`);\n  });\n\n  // Телефон: свой (из базы/CRM/запроса) — можно, чужой — утечка ПДн.\n  const ownPhones = new Set();\n  (index.allText.match(PHONE_RE) || []).forEach((p) => ownPhones.add(p.replace(/\\D/g, '')));\n  if (deal && deal.contact_phone) ownPhones.add(String(deal.contact_phone).replace(/\\D/g, ''));\n  new Set(draft.match(PHONE_RE) || []).forEach((p) => {\n    const digits = p.replace(/\\D/g, '');\n    const known = ownPhones.has(digits);\n    addEntity(p, 'phone', known, `Телефон ${p} не из базы и не от клиента — возможна утечка ПДн`);\n  });\n\n  // --- регламент\n  const ty = TY_RE.exec(draft);\n  if (ty) add('tone_ty', ERROR, 'Обращение на «ты» — регламент требует «вы»',\n    { evidence: ty[0], rule: 'регламент п.1' });\n\n  if (request) {\n    const names = candidateNames(request);\n    if (names.length && !names.some((n) => draft.toLowerCase().includes(n.toLowerCase()))) {\n      add('no_name', WARNING, `Нет обращения по имени (в запросе: ${names.slice(0, 3).join(', ')})`,\n        { rule: 'регламент п.1' });\n    }\n  }\n\n  const knownPrices = new Map(index.priceRows.map((r) => [r.price, r.article]));\n  for (const block of paragraphs(draft)) {\n    const here = new Set(block.text.match(ARTICLE_RE) || []);\n    for (const n of extractNumbers(block.text)) {\n      const article = knownPrices.get(n.value);\n      if (article && !here.has(article)) {\n        add('price_without_article', ERROR,\n          `Цена ${n.raw} названа без артикула (${article})`,\n          { evidence: n.context, line: block.line, rule: 'регламент п.3' });\n      }\n    }\n  }\n\n  const tomorrow = TOMORROW_RE.exec(draft);\n  if (tomorrow) add('promised_tomorrow', ERROR,\n    'Обещано «завтра» — сроки берём только из прайса',\n    { evidence: tomorrow[0], rule: 'регламент п.4' });\n\n  const soon = SOON_RE.exec(draft);\n  if (soon) add('vague_deadline', WARNING, 'Расплывчатый срок вместо срока из прайса',\n    { evidence: soon[0], rule: 'регламент п.4' });\n\n  const absolute = ABSOLUTE_RE.exec(draft) || HUNDRED_RE.exec(draft);\n  if (absolute) add('absolute_promise', ERROR,\n    'Безусловное обещание — так обещать нельзя',\n    { evidence: absolute[0], rule: 'регламент п.4' });\n\n  // Срок из прайса против срока, обещанного рядом с артикулом.\n  for (const block of paragraphs(draft)) {\n    for (const article of new Set(block.text.match(ARTICLE_RE) || [])) {\n      const row = priceOf(index, article);\n      if (!row || row.leadDays === null) continue;\n      for (const n of extractNumbers(maskCodes(block.text))) {\n        if (n.kind !== 'duration') continue;\n        if (n.value !== row.leadDays && n.value !== 0) {\n          add('lead_time_mismatch', WARNING,\n            `Срок ${n.raw} рядом с ${article} расходится с прайсом (${row.leadDays} дн.)`,\n            { evidence: n.context, line: block.line, rule: 'прайс: срок поставки' });\n        }\n      }\n    }\n  }\n\n  const topics = request ? unknownTopics(request, index) : [];\n  if (topics.length) {\n    if (!ADMISSION_RE.test(draft)) {\n      add('no_admission', ERROR,\n        `В базе нет ответа (${topics.slice(0, 3).join(', ')}), но черновик об этом не говорит`,\n        { rule: 'регламент п.5' });\n    }\n    if (!HANDOFF_RE.test(draft)) {\n      add('no_handoff', ERROR, 'Нет передачи менеджеру по вопросу вне базы',\n        { rule: 'регламент п.5' });\n    }\n  }\n\n  if (!draft.toLowerCase().includes(SIGNATURE)) {\n    add('no_signature', ERROR, 'Нет подписи «Команда ТехноСклад»', { rule: 'регламент п.6' });\n  }\n\n  // --- сверка со сделкой (пропускается, если CRM не подключена)\n  if (deal) {\n    const inDeal = new Set((deal.products || []).map((p) => String(p.article).toUpperCase()));\n    for (const a of new Set(draft.match(ARTICLE_RE) || [])) {\n      if (inDeal.size && !inDeal.has(a.toUpperCase()) && !asked.includes(a.toLowerCase())) {\n        add('product_not_in_deal', ERROR,\n          `Артикул ${a} не входит в позиции сделки ${deal.id} и не запрошен клиентом`,\n          { evidence: a, rule: 'CRM: позиции сделки' });\n      }\n    }\n\n    if (deal.total !== undefined && deal.total !== null) {\n      // Итогом считаем только число на строке со словом «итого», и только правее\n      // этого слова. Окно контекста ±28 символов перетекает на соседнюю строку,\n      // из-за чего последняя строка таблицы принималась за итог.\n      const TOTAL_WORD = /(итого|к оплате|всего)/i;\n      String(maskCodes(draft)).split('\\n').forEach((lineText, i) => {\n        const keyword = TOTAL_WORD.exec(lineText);\n        if (!keyword) return;\n        // Итог — ПЕРВОЕ денежное число правее слова «итого». Остальные числа на\n        // той же строке (порог бесплатной доставки и т.п.) итогом не являются.\n        let total = null;\n        let m;\n        NUM_RE.lastIndex = 0;\n        while ((m = NUM_RE.exec(lineText)) !== null) {\n          if (m.index <= keyword.index) continue;\n          if (classify(lineText, m.index, m.index + m[0].length, m[0]) !== 'money') continue;\n          total = { raw: m[0], value: normalize(m[0]) };\n          break;\n        }\n        if (total && !close(total.value, deal.total)) {\n          add('total_mismatch', ERROR,\n            `Итог ${total.raw} расходится с суммой сделки ${money(deal.total)}`,\n            { evidence: lineText.trim(), line: i + 1, rule: 'CRM: сумма сделки' });\n        }\n      });\n    }\n\n    if (deal.currency) {\n      const symbols = { RUB: '₽', USD: '$', EUR: '€' };\n      for (const [code, sign] of Object.entries(symbols)) {\n        if (code !== deal.currency && draft.includes(sign)) {\n          add('currency_mismatch', ERROR,\n            `В черновике валюта ${sign}, а в сделке ${deal.currency}`,\n            { evidence: sign, rule: 'CRM: валюта сделки' });\n        }\n      }\n    }\n\n    if (deal.contact_name && !draft.toLowerCase().includes(String(deal.contact_name).toLowerCase())) {\n      add('contact_name_mismatch', WARNING,\n        `Обращение не к контакту сделки (${deal.contact_name})`,\n        { rule: 'CRM: контакт сделки' });\n    }\n\n    if (deal.stage_allows_shipping === false) {\n      const ship = word(\n        `отгру[зж]${RW}*|отправ${RW}*\\\\s+сегодня|резервиру${RW}*`\n      ).exec(draft);\n      if (ship) {\n        add('stage_conflict', ERROR,\n          `Обещание «${ship[0]}» противоречит стадии сделки (${deal.stage})`,\n          { evidence: ship[0], rule: 'CRM: стадия сделки' });\n      }\n    }\n  }\n\n  const errors = violations.filter((v) => v.severity === ERROR);\n  return {\n    passed: errors.length === 0,\n    stats: {\n      claims: claims.length,\n      grounded: claims.filter((c) => c.grounded).length,\n      ungrounded: claims.filter((c) => !c.grounded).length,\n      errors: errors.length,\n      warnings: violations.length - errors.length,\n      crm: deal ? 'подключена (заглушка)' : 'не подключена',\n    },\n    violations,\n    claims,\n  };\n}\n\n// ------------------------------------------------------------- вход/выход n8n\nconst ctx = $('Сделка Bitrix24 (заглушка)').first().json;\nconst incoming = $input.first().json;\nconst draft = incoming.output || incoming.text || incoming.draft || '';\n\nconst verdict = checkDraft({\n  draft,\n  request: ctx.request,\n  base: ctx.base,\n  deal: ctx.deal,\n});\n\nreturn [{ json: Object.assign({ draft }, verdict) }];"
+      },
+      "name": "ГАРД — проверка черновика",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "passed",
+              "leftValue": "={{ $json.passed }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Гард пропустил?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s",
+              "name": "статус",
+              "value": "проверено, можно отправлять",
+              "type": "string"
+            },
+            {
+              "id": "d",
+              "name": "текст",
+              "value": "={{ $json.draft }}",
+              "type": "string"
+            },
+            {
+              "id": "g",
+              "name": "фактов_с_источником",
+              "value": "={{ $json.stats.grounded }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "OK — можно отправлять клиенту",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s",
+              "name": "статус",
+              "value": "НЕ отправлять — есть нарушения",
+              "type": "string"
+            },
+            {
+              "id": "d",
+              "name": "текст",
+              "value": "={{ $json.draft }}",
+              "type": "string"
+            },
+            {
+              "id": "v",
+              "name": "нарушения",
+              "value": "={{ $json.violations.filter(v => v.severity === \"error\").map(v => v.message).join(\"\\n\") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "СТОП — на ревью менеджеру",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1440,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Вход\\nРучной запуск — для демо.\\nWebhook POST /answer-guard — для интеграции:\\n`{ \"request\": \"текст клиента\" }`",
+        "height": 150,
+        "width": 420,
+        "color": 4
+      },
+      "name": "Note -260_-180",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Шов под Bitrix24\\nСейчас сделка приходит из заглушки.\\n\\nЧтобы подключить CRM: включить HTTP-ноду ниже,\\nотдать её ответ в том же виде\\n(products / total / currency / stage / contact_name)\\nи всё остальное продолжит работать без правок.\\n\\n`deal: null` — проверки по сделке молчат.",
+        "height": 200,
+        "width": 420,
+        "color": 3
+      },
+      "name": "Note 420_440",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        420,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Гард — единственное место, где решается,\\n## увидит ли клиент этот текст\\n\\nСтоит ЖЁСТКО в цепочке, а не как tool агента:\\nмодель не может его обойти или «решить не звать».\\n\\nПроверяет:\\n· каждое число — из базы, из запроса клиента\\n  или выводится арифметикой по прайсу\\n· артикулы, email, ссылки, телефоны\\n· регламент: «вы», подпись, цена с артикулом,\\n  запрет «завтра» и безусловных обещаний\\n· сверку со сделкой из CRM\\n\\nИсходник: n8n/guard.js · тесты: node n8n/selftest.js",
+        "height": 280,
+        "width": 440,
+        "color": 6
+      },
+      "name": "Note 940_-220",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        940,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Развилка\\nIF, а не Filter: у Filter один выход,\\nи забракованные черновики он молча выбрасывает.\\nЗдесь обе ветки живые — брак уходит человеку.",
+        "height": 150,
+        "width": 380,
+        "color": 5
+      },
+      "name": "Note 1420_-180",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1420,
+        -180
+      ]
+    }
+  ],
+  "connections": {
+    "Запустить вручную": {
+      "main": [
+        [
+          {
+            "node": "Пример запроса",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Пример запроса": {
+      "main": [
+        [
+          {
+            "node": "База знаний (заглушка)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "База знаний (заглушка)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "База знаний (заглушка)": {
+      "main": [
+        [
+          {
+            "node": "Сделка Bitrix24 (заглушка)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сделка Bitrix24 (заглушка)": {
+      "main": [
+        [
+          {
+            "node": "Черновик ответа",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Черновик ответа",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Черновик ответа": {
+      "main": [
+        [
+          {
+            "node": "ГАРД — проверка черновика",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ГАРД — проверка черновика": {
+      "main": [
+        [
+          {
+            "node": "Гард пропустил?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Гард пропустил?": {
+      "main": [
+        [
+          {
+            "node": "OK — можно отправлять клиенту",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "СТОП — на ревью менеджеру",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

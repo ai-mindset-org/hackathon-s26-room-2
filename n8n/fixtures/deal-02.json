@@ -1,0 +1,15 @@
+{
+  "_комментарий": "Заглушка сделки Bitrix24. Ровно та форма данных, которую вернёт crm.deal.get + crm.deal.productrows.get + crm.contact.get. Подключение Bitrix меняет источник, но не форму.",
+  "id": "1042",
+  "currency": "RUB",
+  "total": 485266,
+  "stage": "В работе",
+  "stage_allows_shipping": true,
+  "contact_name": "Иван",
+  "contact_phone": "+7 999 123-45-67",
+  "products": [
+    { "article": "TS-192E", "name": "SSD 1.92 TB enterprise", "price": 33900, "quantity": 12 },
+    { "article": "TS-16H", "name": "HDD 16 TB", "price": 39800, "quantity": 2 },
+    { "article": "TS-TRAY", "name": "Салазки универсальные", "price": 2100, "quantity": 14 }
+  ]
+}
