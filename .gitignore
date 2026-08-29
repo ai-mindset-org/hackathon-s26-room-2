@@ -4,3 +4,7 @@
 node_modules/
 __pycache__/
 .DS_Store
+bot/.env
+bot/data/
+__pycache__/
+*.py[cod]
