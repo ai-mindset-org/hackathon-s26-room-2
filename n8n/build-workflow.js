@@ -51,11 +51,16 @@ const BASE_CODE = `// ЗАГЛУШКА БАЗЫ ЗНАНИЙ.
 // В проде тут Supabase/Postgres retrieval — вернуть те же поля, и ничего ниже
 // по цепочке менять не придётся.
 const src = $input.first().json;
-const request = src.request || (src.body && src.body.request) || '';
+const body = src.body || {};
+const request = src.request || body.request || '';
+
+// draft_override — только для проверки самого гарда: позволяет прогнать через
+// цепочку заведомо плохой черновик, не полагаясь на то, что модель ошибётся.
+const draft_override = src.draft_override || body.draft_override || null;
 
 const base = ${JSON.stringify(baseFiles, null, 2)};
 
-return [{ json: { request, base } }];`;
+return [{ json: { request, base, draft_override } }];`;
 
 const DEAL_CODE = `// ЗАГЛУШКА СДЕЛКИ BITRIX24 — тот самый «пустой слот» под CRM.
 // Форма данных ровно та, что вернут crm.deal.get + crm.deal.productrows.get +
@@ -68,14 +73,21 @@ const prev = $input.first().json;
 
 const deal = ${JSON.stringify(dealStub, null, 2)};
 
-return [{ json: { request: prev.request, base: prev.base, deal } }];`;
+return [{
+  json: {
+    request: prev.request,
+    base: prev.base,
+    draft_override: prev.draft_override || null,
+    deal,
+  },
+}];`;
 
 const GUARD_CODE = `${guardSource}
 
 // ------------------------------------------------------------- вход/выход n8n
 const ctx = $('Сделка Bitrix24 (заглушка)').first().json;
 const incoming = $input.first().json;
-const draft = incoming.output || incoming.text || incoming.draft || '';
+const draft = ctx.draft_override || incoming.output || incoming.text || incoming.draft || '';
 
 const verdict = checkDraft({
   draft,
