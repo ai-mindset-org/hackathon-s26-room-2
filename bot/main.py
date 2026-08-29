@@ -38,6 +38,17 @@ def notify_operator(api, support_id, user, question, history, reason):
         logging.exception("Failed to send escalation")
         log_escalation(report + "\nОшибка отправки: %s" % exc)
 
+MAX_TEXT_LEN = 2000
+RATE_LIMIT_N, RATE_WINDOW_S = 5, 60
+_rate = {}
+
+def rate_limited(user_id):
+    now = time.time()
+    hits = [t for t in _rate.get(user_id, []) if now - t < RATE_WINDOW_S]
+    if len(hits) >= RATE_LIMIT_N:
+        _rate[user_id] = hits; return True
+    hits.append(now); _rate[user_id] = hits; return False
+
 def handle_message(api, store, index, message, support_id):
     chat, sender = message.get("chat", {}), message.get("from", {})
     if chat.get("type") != "private" or not sender: return
@@ -45,6 +56,10 @@ def handle_message(api, store, index, message, support_id):
     text = message.get("text")
     if not text:
         api.send_message(chat["id"], "Пожалуйста, опишите вопрос текстом — так я смогу помочь."); return
+    if len(text) > MAX_TEXT_LEN:
+        api.send_message(chat["id"], "Сообщение слишком длинное — сократите, пожалуйста, до %d символов." % MAX_TEXT_LEN); return
+    if rate_limited(user["id"]):
+        api.send_message(chat["id"], "Слишком много сообщений подряд — подождите минуту, пожалуйста."); return
     if text.startswith("/start"):
         reply = "Здравствуйте%s! Я поддержка биржи. Опишите ваш вопрос текстом." % ((", " + user["first_name"]) if user["first_name"] else "")
         store.add(user["id"], user["username"], user["first_name"], "assistant", reply); api.send_message(chat["id"], reply); return
