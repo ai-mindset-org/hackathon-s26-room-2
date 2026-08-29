@@ -5,6 +5,7 @@ import sys
 import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from bot.brain import decide
+from bot.gate import guard_gate
 from bot.index import BM25Index
 from bot.store import HistoryStore
 from bot.telegram_api import TelegramAPI
@@ -80,9 +81,11 @@ def handle_message(api, store, index, message, support_id):
         decision = decide(index, user, text, history)
     finally:
         stop_typing.set()
-    store.add(user["id"], user["username"], user["first_name"], "assistant", decision["reply"])
-    api.send_message(chat["id"], decision["reply"])
-    if decision["action"] == "escalate": notify_operator(api, support_id, user, text, history, decision["reason"])
+    safe_reply, blocked, errors = guard_gate(decision["reply"], text)
+    store.add(user["id"], user["username"], user["first_name"], "assistant", safe_reply)
+    api.send_message(chat["id"], safe_reply)
+    if blocked: logging.warning("guard blocked reply: %s", "; ".join("%s: %s" % (e.kind, e.message) for e in errors))
+    if decision["action"] == "escalate" or blocked: notify_operator(api, support_id, user, text, history, decision["reason"] if not blocked else "guard: черновик не прошёл проверку")
 
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
