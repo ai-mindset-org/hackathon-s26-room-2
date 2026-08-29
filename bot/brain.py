@@ -11,14 +11,18 @@ SYSTEM_RULES = '''Ты — оператор поддержки крипто-би
 Обращайся к клиенту по имени из профиля, если имя есть. Тон дружелюбный и короткий.
 Если в чанках нет достаточной информации, вопрос требует доступа к аккаунту,
 проверки транзакции, ручного вмешательства или есть сомнение — action "escalate".
+Если клиент спрашивает о теме, по которой раньше была эскалация, а в чанках
+теперь есть данные — ответь из чанков, не отсылай к оператору повторно.
+Вопрос «что там с X?» трактуй как вопрос о самом X: расскажи про X из чанков.
 При escalate в reply вежливо скажи, что вопрос передан оператору.'''
 
 
 def decide(index, user, message, history):
     history = history[-20:]
-    # The fresh question has priority; history supplies context but must not drown it out.
-    query = message + "\n" + message + "\n" + "\n".join(item["text"] for item in history)
-    chunks = index.search(query, 6)
+    # Ищем по сообщениям клиента (свежее — с большим весом); ответы бота в запрос не берём.
+    user_texts = [item["text"] for item in history if item.get("role") == "user"][-3:]
+    query = message + "\n" + message + "\n" + "\n".join(user_texts)
+    chunks = index.search(query, 8)
     try:
         result = _parse_result(_run_codex(_prompt(user, message, history, chunks)))
         if result["action"] not in ("answer", "escalate") or not result["reply"]:

@@ -12,3 +12,4 @@ class TelegramAPI:
     def get_me(self): return self.call("getMe", timeout=15)
     def get_updates(self, offset): return self.call("getUpdates", {"offset": offset, "timeout": 30, "allowed_updates": ["message"]}, timeout=40)
     def send_message(self, chat_id, text): return self.call("sendMessage", {"chat_id": chat_id, "text": text}, timeout=15)
+    def send_typing(self, chat_id): return self.call("sendChatAction", {"chat_id": chat_id, "action": "typing"}, timeout=10)

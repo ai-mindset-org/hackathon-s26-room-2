@@ -7,9 +7,41 @@ from collections import Counter, defaultdict
 WORD_RE = re.compile(r"[a-zа-яё0-9]+", re.IGNORECASE)
 SKIP_FILES = {"МАНИФЕСТ.csv", "ОТЧЁТ_ОБЕЗЛИЧИВАНИЯ.md"}
 
+# Разговорные формы → термины базы.
+SYNONYMS = {
+    "амл": ["aml"], "апи": ["api"], "кус": ["kyc"], "kyc": ["верификация"],
+    "зарегать": ["регистрация"], "зарегаться": ["регистрация"], "регнуть": ["регистрация"],
+    "рега": ["регистрация"], "акк": ["аккаунт"], "аккаунт": ["счет"],
+    "счет": ["аккаунт", "регистрация"], "счёт": ["аккаунт", "регистрация"],
+    "верифа": ["верификация"], "верифнуть": ["верификация"],
+    "пруф": ["подтверждение"], "бабки": ["средства"], "деньги": ["средства"],
+    "вывести": ["вывод"], "закинуть": ["пополнение"], "пополнить": ["пополнение"],
+    "п2п": ["p2p"], "юзер": ["пользователь"], "тех": ["техническая"],
+}
+
+_SUFFIXES = ("иями", "ями", "ами", "ого", "его", "ому", "ему", "ыми", "ими",
+             "ая", "яя", "ой", "ей", "ий", "ый", "ое", "ее", "ах", "ях", "ам", "ям",
+             "ом", "ем", "ов", "ев", "ах", "ия", "ие", "ии", "ью", "ть", "ет", "ут",
+             "ют", "ат", "ят", "а", "я", "о", "е", "у", "ю", "ы", "и", "ь", "й")
+
+
+def _stem(word):
+    if len(word) <= 4 or not re.match(r"[а-яё]", word):
+        return word
+    for suffix in _SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= 4:
+            return word[:-len(suffix)]
+    return word
+
 
 def tokenize(text):
-    return WORD_RE.findall(text.lower())
+    raw = WORD_RE.findall(text.lower())
+    out = []
+    for word in raw:
+        out.append(_stem(word))
+        for syn in SYNONYMS.get(word, ()):  # синонимы добавляем к запросу и документу
+            out.append(_stem(syn))
+    return out
 
 
 class Chunk:
@@ -73,15 +105,27 @@ def _markdown_chunks(path, root):
             lines = handle.read().splitlines()
     except (OSError, UnicodeError):
         return []
-    output, title, buffer = [], os.path.basename(path), []
+    output, buffer = [], []
+    stack = [(0, os.path.basename(path))]  # (уровень, заголовок): путь от корня документа
+    def title_path():
+        return " > ".join(t for _, t in stack)
     def flush():
-        if buffer and any(line.strip() for line in buffer):
-            output.append(Chunk(os.path.relpath(path, root), title, "\n".join(buffer)))
+        body = [line for line in buffer if line.strip()]
+        if body:
+            # Заголовочный путь кладём в текст чанка: вопрос из родительского
+            # заголовка остаётся рядом со своим ответом и участвует в поиске.
+            text = title_path() + "\n" + "\n".join(buffer)
+            output.append(Chunk(os.path.relpath(path, root), title_path(), text))
     for line in lines:
-        if line.startswith("#") and line.lstrip("#").startswith(" "):
-            flush(); title, buffer = line.lstrip("#").strip(), [line]
+        match = re.match(r"^(#{1,6})\s+(.+)", line)
+        if match:
+            flush(); buffer = []
+            level, heading = len(match.group(1)), match.group(2).strip()
+            while len(stack) > 1 and stack[-1][0] >= level:
+                stack.pop()
+            stack.append((level, heading))
         elif len(buffer) >= 120:
-            flush(); buffer = ["(продолжение: %s)" % title, line]
+            flush(); buffer = [line]
         else:
             buffer.append(line)
     flush()

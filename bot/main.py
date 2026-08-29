@@ -28,6 +28,8 @@ def log_escalation(text):
         handle.write("[%s] %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), text))
 
 def notify_operator(api, support_id, user, question, history, reason):
+    ops_token = os.environ.get("OPS_BOT_TOKEN", "")
+    ops_api = TelegramAPI(ops_token) if ops_token else api
     transcript = "\n".join("%s: %s" % (entry["role"], entry["text"]) for entry in history[-20:])
     report = "ЭСКАЛАЦИЯ\nКлиент: %s (@%s, id=%s)\nВопрос: %s\nПричина: %s\nПоследний контекст:\n%s" % (user.get("first_name") or "без имени", user.get("username") or "—", user["id"], question, reason, transcript or "—")
     if not support_id:
@@ -64,8 +66,20 @@ def handle_message(api, store, index, message, support_id):
         reply = "Здравствуйте%s! Я поддержка биржи. Опишите ваш вопрос текстом." % ((", " + user["first_name"]) if user["first_name"] else "")
         store.add(user["id"], user["username"], user["first_name"], "assistant", reply); api.send_message(chat["id"], reply); return
     store.add(user["id"], user["username"], user["first_name"], "user", text)
+    try: api.send_typing(chat["id"])
+    except Exception: pass
     history = store.recent(user["id"], 20)
-    decision = decide(index, user, text, history)
+    import threading
+    stop_typing = threading.Event()
+    def keep_typing():
+        while not stop_typing.wait(4.5):
+            try: api.send_typing(chat["id"])
+            except Exception: pass
+    t = threading.Thread(target=keep_typing, daemon=True); t.start()
+    try:
+        decision = decide(index, user, text, history)
+    finally:
+        stop_typing.set()
     store.add(user["id"], user["username"], user["first_name"], "assistant", decision["reply"])
     api.send_message(chat["id"], decision["reply"])
     if decision["action"] == "escalate": notify_operator(api, support_id, user, text, history, decision["reason"])
