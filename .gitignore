@@ -8,3 +8,4 @@ bot/.env
 bot/data/
 __pycache__/
 *.py[cod]
+.worktrees/
